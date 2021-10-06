@@ -478,13 +478,14 @@ def draw_sequence(
                 pos_masked.append(coord)
             else:
                 pos_unmasked.append(coord)
-        ax.scatter(
-            np.array(pos_unmasked)[:, 0],
-            np.array(pos_unmasked)[:, 1],
-            s=30,
-            alpha=0.7,
-            c="darkgreen",
-        )
+        if pos_unmasked:
+            ax.scatter(
+                np.array(pos_unmasked)[:, 0],
+                np.array(pos_unmasked)[:, 1],
+                s=30,
+                alpha=0.7,
+                c="darkgreen",
+            )
         if pos_masked:
             ax.scatter(
                 np.array(pos_masked)[:, 0],
