@@ -107,6 +107,7 @@ def draw_sequence(
     draw_phase_area: bool = False,
     draw_interp_pts: bool = True,
     draw_phase_shifts: bool = False,
+    draw_register: bool = False,
 ) -> None:
     """Draws the entire sequence.
 
@@ -122,6 +123,9 @@ def draw_sequence(
             top of the respective waveforms (defaults to True).
         draw_phase_shifts (bool): Whether phase shift and reference information
             should be added to the plot, defaults to False.
+        draw_register (bool): Whether to draw the register after the pulse
+            sequence, with a visual indication for the qubits masked by the
+            SLM, defaults to False.
     """
 
     def phase_str(phi: float) -> str:
@@ -147,8 +151,15 @@ def draw_sequence(
     area_ph_box = dict(boxstyle="round", facecolor="ghostwhite", alpha=0.7)
     slm_box = dict(boxstyle="round", alpha=0.4, facecolor="grey", hatch="//")
 
-    fig = plt.figure(constrained_layout=False, figsize=(20, 4.5 * n_channels))
-    gs = fig.add_gridspec(n_channels, 1, hspace=0.075)
+    fig = plt.figure(
+        constrained_layout=False,
+        figsize=(20, 4.5 * n_channels + 10 * int(draw_register)),
+    )
+    gs = fig.add_gridspec(
+        n_channels + int(draw_register),
+        1,
+        hspace=0.075 + 0.027 * int(draw_register),
+    )
 
     ch_axes = {}
     for i, (ch, gs_) in enumerate(zip(seq._channels, gs)):
@@ -445,5 +456,50 @@ def draw_sequence(
             if "detuning" in all_points:
                 pts = np.array(all_points["detuning"])
                 b.scatter(pts[:, 0], pts[:, 1], color="indigo")
+
+    # Draw the register
+    if draw_register:
+        big_ax = fig.add_subplot(gs[-1])
+        big_ax.set_ylabel("Register", labelpad=40, fontsize=18)
+        big_ax.spines["top"].set_color("none")
+        big_ax.spines["bottom"].set_color("none")
+        big_ax.spines["left"].set_color("none")
+        big_ax.spines["right"].set_color("none")
+        big_ax.tick_params(
+            labelcolor="w", top=False, bottom=False, left=False, right=False
+        )
+
+        subgs = gs[-1].subgridspec(1, 2)
+        ax = fig.add_subplot(subgs[0, 0])
+        pos_unmasked = []
+        pos_masked = []
+        for id, coord in zip(seq._register._ids, seq._register._coords):
+            if id in seq._slm_mask_targets:
+                pos_masked.append(coord)
+            else:
+                pos_unmasked.append(coord)
+        ax.scatter(
+            np.array(pos_unmasked)[:, 0],
+            np.array(pos_unmasked)[:, 1],
+            s=30,
+            alpha=0.7,
+            c="darkgreen",
+        )
+        if pos_masked:
+            ax.scatter(
+                np.array(pos_masked)[:, 0],
+                np.array(pos_masked)[:, 1],
+                marker="x",
+                s=50,
+                alpha=0.7,
+                c="red",
+            )
+
+        ax.set_xlabel("µm")
+        ax.set_ylabel("µm")
+        ax.axis("equal")
+
+        for q, coords in zip(seq._register._ids, seq._register._coords):
+            ax.annotate(q, coords, fontsize=12, ha="left", va="bottom")
 
     plt.show()
