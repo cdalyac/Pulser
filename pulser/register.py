@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Iterable
 import matplotlib.pyplot as plt
 from matplotlib import collections as mc
+from matplotlib.axes import Axes
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.spatial import KDTree
@@ -453,6 +454,79 @@ class Register:
         )
         self._coords = [rot @ v for v in self._coords]
 
+    def _plot(
+        self,
+        ax: Axes,
+        with_labels: bool = True,
+        blockade_radius: Optional[float] = None,
+        draw_graph: bool = True,
+        draw_half_radius: bool = False,
+        masked_qubits: set[QubitId] = set(),
+    ) -> None:
+        pos_unmasked = []
+        pos_masked = []
+        for id, coord in zip(self._ids, self._coords):
+            if id not in masked_qubits:
+                pos_unmasked.append(coord)
+            else:
+                pos_masked.append(coord)
+        pos = np.array(pos_unmasked + pos_masked)
+
+        if pos_unmasked:
+            ax.scatter(
+                np.array(pos_unmasked)[:, 0],
+                np.array(pos_unmasked)[:, 1],
+                s=30,
+                alpha=0.7,
+                c="darkgreen",
+            )
+
+        if pos_masked:
+            ax.scatter(
+                np.array(pos_masked)[:, 0],
+                np.array(pos_masked)[:, 1],
+                s=30,
+                alpha=0.7,
+                c="grey",
+            )
+
+        ax.set_xlabel("µm")
+        ax.set_ylabel("µm")
+        ax.axis("equal")
+        ax.spines["right"].set_color("none")
+        ax.spines["top"].set_color("none")
+
+        if with_labels:
+            for q, coords in zip(self._ids, self._coords):
+                label = str(q) + "\n(masked)" * (q in masked_qubits)
+                ax.annotate(label, coords, fontsize=12, ha="left", va="bottom")
+
+        if draw_half_radius:
+            if blockade_radius is None:
+                raise ValueError("Define 'blockade_radius' to draw.")
+            if len(pos_unmasked) + len(pos_masked) == 1:
+                raise NotImplementedError(
+                    "Needs more than one atom to draw " "the blockade radius."
+                )
+
+            for p in pos:
+                circle = plt.Circle(
+                    tuple(p), blockade_radius / 2, alpha=0.1, color="darkgreen"
+                )
+                ax.add_patch(circle)
+
+        if draw_graph and blockade_radius is not None:
+            epsilon = 1e-9  # Accounts for rounding errors
+            edges = KDTree(pos).query_pairs(blockade_radius * (1 + epsilon))
+            lines = pos[(tuple(edges),)]
+            lc = mc.LineCollection(lines, linewidths=0.6, colors="grey")
+            ax.add_collection(lc)
+
+        else:
+            # Only draw central axis lines when not drawing the graph
+            ax.axvline(0, c="grey", alpha=0.5, linestyle=":")
+            ax.axhline(0, c="grey", alpha=0.5, linestyle=":")
+
     def draw(
         self,
         with_labels: bool = True,
@@ -505,43 +579,13 @@ class Register:
         )  # Figsize is, at most, (10,10)
 
         fig, ax = plt.subplots(figsize=Ls)
-        ax.scatter(pos[:, 0], pos[:, 1], s=30, alpha=0.7, c="darkgreen")
-
-        ax.set_xlabel("µm")
-        ax.set_ylabel("µm")
-        ax.axis("equal")
-        ax.spines["right"].set_color("none")
-        ax.spines["top"].set_color("none")
-
-        if with_labels:
-            for q, coords in zip(self._ids, self._coords):
-                ax.annotate(q, coords, fontsize=12, ha="left", va="bottom")
-
-        if draw_half_radius:
-            if blockade_radius is None:
-                raise ValueError("Define 'blockade_radius' to draw.")
-            if len(pos) == 1:
-                raise NotImplementedError(
-                    "Needs more than one atom to draw " "the blockade radius."
-                )
-
-            for p in pos:
-                circle = plt.Circle(
-                    tuple(p), blockade_radius / 2, alpha=0.1, color="darkgreen"
-                )
-                ax.add_patch(circle)
-        if draw_graph and blockade_radius is not None:
-            epsilon = 1e-9  # Accounts for rounding errors
-            edges = KDTree(pos).query_pairs(blockade_radius * (1 + epsilon))
-            lines = pos[(tuple(edges),)]
-            lc = mc.LineCollection(lines, linewidths=0.6, colors="grey")
-            ax.add_collection(lc)
-
-        else:
-            # Only draw central axis lines when not drawing the graph
-            ax.axvline(0, c="grey", alpha=0.5, linestyle=":")
-            ax.axhline(0, c="grey", alpha=0.5, linestyle=":")
-
+        self._plot(
+            ax,
+            with_labels,
+            blockade_radius,
+            draw_graph,
+            draw_half_radius,
+        )
         plt.show()
 
     def _to_dict(self) -> dict[str, Any]:

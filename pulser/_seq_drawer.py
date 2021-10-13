@@ -471,36 +471,6 @@ def draw_sequence(
 
         subgs = gs[-1].subgridspec(1, 2)
         ax = fig.add_subplot(subgs[0, 0])
-        pos_unmasked = []
-        pos_masked = []
-        for id, coord in zip(seq._register._ids, seq._register._coords):
-            if id in seq._slm_mask_targets:
-                pos_masked.append(coord)
-            else:
-                pos_unmasked.append(coord)
-        if pos_unmasked:
-            ax.scatter(
-                np.array(pos_unmasked)[:, 0],
-                np.array(pos_unmasked)[:, 1],
-                s=30,
-                alpha=0.7,
-                c="darkgreen",
-            )
-        if pos_masked:
-            ax.scatter(
-                np.array(pos_masked)[:, 0],
-                np.array(pos_masked)[:, 1],
-                marker="x",
-                s=50,
-                alpha=0.7,
-                c="red",
-            )
-
-        ax.set_xlabel("µm")
-        ax.set_ylabel("µm")
-        ax.axis("equal")
-
-        for q, coords in zip(seq._register._ids, seq._register._coords):
-            ax.annotate(q, coords, fontsize=12, ha="left", va="bottom")
+        seq._register._plot(ax=ax, masked_qubits=seq._slm_mask_targets)
 
     plt.show()
